@@ -44,6 +44,7 @@
 #endif
 
 #include "utp.h"
+#include "utp_utils.h"
 
 // options
 int o_debug;
@@ -60,6 +61,9 @@ int fd;
 int buf_len = 0;
 unsigned char *buf, *p;
 int eof_flag, utp_eof_flag, utp_shutdown_flag, quit_flag, exit_code;
+
+static uint64_t time_prev = 0;
+static int tot_num_bytes = 0;
 
 void die(char *fmt, ...)
 {
@@ -127,6 +131,14 @@ void write_data(void)
         goto out;
 
     while (p < buf+buf_len) {
+        uint64_t time_cur = utp_default_get_milliseconds(NULL);
+
+        if ((time_cur - time_prev) >= 1000) {
+            printf("sent %.2f kb\n", (float)tot_num_bytes / 1000);
+            time_prev = time_cur;
+            tot_num_bytes = 0;
+        }
+
         size_t sent;
 
         sent = utp_write(s, p, buf+buf_len-p);
@@ -136,6 +148,8 @@ void write_data(void)
         }
 
         p += sent;
+
+        tot_num_bytes += sent;
 
         if (p == buf+buf_len) {
                 debug("wrote %zd bytes; buffer now empty\n", sent);
@@ -170,6 +184,16 @@ uint64 callback_on_read(utp_callback_arguments *a)
 
     left = a->len;
     p = a->buf;
+
+    tot_num_bytes += left;
+
+    uint64_t time_cur = utp_default_get_milliseconds(NULL);
+
+    if ((time_cur - time_prev) >= 1000) {
+        fprintf(stderr, "recv %.2f kb\n", (float)tot_num_bytes / 1000);
+        time_prev = time_cur;
+        tot_num_bytes = 0;
+    }
 
     while (left) {
         len = write(STDOUT_FILENO, p, left);
@@ -333,6 +357,8 @@ void setup(void)
     ctx = utp_init(2);
     assert(ctx);
     debug("UTP context %p\n", ctx);
+
+    time_prev = utp_default_get_milliseconds(NULL);
 
     utp_set_callback(ctx, UTP_LOG,				&callback_log);
     utp_set_callback(ctx, UTP_SENDTO,			&callback_sendto);
