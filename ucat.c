@@ -360,6 +360,9 @@ void setup(void)
 
     time_prev = utp_default_get_milliseconds(NULL);
 
+    utp_context_set_option(ctx, UTP_RCVBUF, 128 * 1024);
+    utp_context_set_option(ctx, UTP_SNDBUF, 128 * 1024);
+
     utp_set_callback(ctx, UTP_LOG,				&callback_log);
     utp_set_callback(ctx, UTP_SENDTO,			&callback_sendto);
     utp_set_callback(ctx, UTP_ON_ERROR,			&callback_on_error);
